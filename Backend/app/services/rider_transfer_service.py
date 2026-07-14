@@ -7,13 +7,9 @@ from app.models.order import Order
 from app.models.rider import Rider
 from app.models.otp import OTP
 
-from app.services.ledger_service import (
-    get_or_create_wallet,
-    _create_ledger_entry,
-    ADMIN_ENTITY_TYPE,
-    ADMIN_ENTITY_ID,
-    RIDER_ENTITY_TYPE,
-)
+import uuid
+from app.services.ledger_service import WalletService, PLATFORM_USER_ID
+from app.models.ledger_entry import TransactionPurpose
 
 TRANSFER_PENALTY = Decimal("50.00")
 
@@ -92,38 +88,35 @@ def transfer_order(
         otp.is_used = True
 
         # Check wallet balance for penalty
-        rider_wallet = get_or_create_wallet(
-            db,
-            RIDER_ENTITY_TYPE,
-            rider.id
-        )
+        rider_balance = WalletService.get_balance(db, rider.user_id)
 
-        if rider_wallet.balance < TRANSFER_PENALTY:
+        if rider_balance < TRANSFER_PENALTY:
             raise HTTPException(status_code=400, detail="Insufficient balance for penalty")
 
-        admin_wallet = get_or_create_wallet(
-            db,
-            ADMIN_ENTITY_TYPE,
-            ADMIN_ENTITY_ID
-        )
-
         # Ledger Penalty Transfer
-        _create_ledger_entry(
-            db,
-            rider_wallet,
-            "DEBIT",
-            TRANSFER_PENALTY,
-            order.id,
-            "Order Transfer Penalty",
+        cid = str(uuid.uuid4())
+        ik = f"transfer-penalty-{order.id}-{rider.id}"
+
+        WalletService._debit(
+            db=db,
+            user_id=rider.user_id,
+            amount=TRANSFER_PENALTY,
+            transaction_type=TransactionPurpose.ADJUSTMENT,
+            correlation_id=cid,
+            description=f"Order #{order.id} Transfer Penalty",
+            order_id=order.id,
+            idempotency_key=f"{ik}-dr"
         )
 
-        _create_ledger_entry(
-            db,
-            admin_wallet,
-            "CREDIT",
-            TRANSFER_PENALTY,
-            order.id,
-            "Transfer Penalty Received",
+        WalletService._credit(
+            db=db,
+            user_id=PLATFORM_USER_ID,
+            amount=TRANSFER_PENALTY,
+            transaction_type=TransactionPurpose.ADJUSTMENT,
+            correlation_id=cid,
+            description=f"Transfer Penalty Received from Rider #{rider.id}",
+            order_id=order.id,
+            idempotency_key=f"{ik}-cr"
         )
 
         # Reset order

@@ -424,3 +424,47 @@ class UdharService:
 
         db.flush()
         return len(accounts)
+
+
+def add_udhar_debit(
+    db: Session,
+    shop_id: int,
+    customer_id: int,
+    order_id: int,
+    amount: Decimal,
+) -> UdharTransaction:
+    """
+    Wrapper function to support delivery-time Udhar debiting.
+    Finds the active UdharAccount between borrower (customer_id) and lender (shop_id),
+    then uses UdharService.use_credit.
+    """
+    from app.models.shop import Shop
+
+    # 1. Find the Shop to get the shop owner's user_id
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(404, f"Shop #{shop_id} not found.")
+
+    # 2. Find the active UdharAccount
+    account = (
+        db.query(UdharAccount)
+        .filter(
+            UdharAccount.borrower_id == customer_id,
+            UdharAccount.lender_shop_id == shop_id,
+        )
+        .first()
+    )
+    if not account:
+        raise HTTPException(
+            404,
+            f"No Udhar credit account exists between Customer #{customer_id} and Shop #{shop_id}."
+        )
+
+    # 3. Use the credit
+    return UdharService.use_credit(
+        db=db,
+        udhar_account_id=account.id,
+        amount=amount,
+        shop_user_id=shop.user_id,
+        order_id=order_id,
+    )
