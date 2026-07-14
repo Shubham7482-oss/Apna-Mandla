@@ -12,3 +12,7 @@ pydantic-settings
 python-slugify
 qrcode
 pillow
+redis
+requests
+apscheduler
+firebase-admin

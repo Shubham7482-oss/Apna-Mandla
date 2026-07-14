@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 
 from app.models.product import Product
-from app.models.discount import Discount
 from app.schemas.product import ProductCreate
 
 class ProductService:

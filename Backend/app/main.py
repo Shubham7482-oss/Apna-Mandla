@@ -87,10 +87,12 @@ async def add_security_headers(request, call_next):
 # ─────────────────────────────────────────────────────────────────────────────
 
 if settings.CORS_ORIGINS:
+    # Under standard security rules, allow_credentials must be False if "*" is allowed.
+    allow_all_origins = "*" in settings.CORS_ORIGINS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,   # required for cookies to be sent cross-origin
+        allow_credentials=not allow_all_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Authorization",
@@ -101,7 +103,11 @@ if settings.CORS_ORIGINS:
         expose_headers=["X-Request-ID"],
         max_age=600,
     )
-    logger.info("CORS enabled for origins: %s", settings.CORS_ORIGINS)
+    logger.info(
+        "CORS enabled for origins: %s (allow_credentials=%s)",
+        settings.CORS_ORIGINS,
+        not allow_all_origins,
+    )
 else:
     logger.warning(
         "CORS_ORIGINS is empty — cross-origin requests will be blocked. "
@@ -141,7 +147,18 @@ app.include_router(
 # STATIC
 # ─────────────────────────────────────────────────────────────────────────────
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+import os
+static_dir = "static"
+if not os.path.exists(static_dir):
+    for path in ["Backend/app/static", "app/static"]:
+        if os.path.exists(path):
+            static_dir = path
+            break
+
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+else:
+    logger.warning("Static directory '%s' not found.", static_dir)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

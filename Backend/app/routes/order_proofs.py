@@ -16,13 +16,13 @@ router = APIRouter(prefix="/orders/proof", tags=["Order Proofs"])
 # ──────────────────────────────────────────────────────────
 @router.post("/{order_id}/pickup-proof")
 def rider_pickup_proof(
-    order_id: int, 
+    order_id: int,
     photo_url: str, # Flutter pehle image upload karke URL yahan bhejega
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     order = db.query(Order).filter(Order.id == order_id).first()
-    
+
     if not order:
         raise HTTPException(404, "Order nahi mila")
 
@@ -37,13 +37,13 @@ def rider_pickup_proof(
     # Proof save karein aur status badlein
     order.pickup_photo = photo_url
     order.status = OrderStatus.OUT_FOR_DELIVERY
-    
+
     # 🚨 OTP Generate karna (4-digit as per your old code)
     # Use `secrets` for cryptographically secure random numbers
     order.delivery_otp = str(secrets.randbelow(10000)).zfill(4)
-    
+
     db.commit()
-    
+
     return {
         "message": "Pickup confirmed! OTP has been sent to the customer.",
         "otp_sent_to": order.customer.phone_number
@@ -54,14 +54,14 @@ def rider_pickup_proof(
 # ──────────────────────────────────────────────────────────
 @router.post("/{order_id}/complete-delivery")
 def complete_delivery(
-    order_id: int, 
-    otp: str, 
-    photo_url: str, 
-    db: Session = Depends(get_db), 
+    order_id: int,
+    otp: str,
+    photo_url: str,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     order = db.query(Order).filter(Order.id == order_id).first()
-    
+
     if not order:
         raise HTTPException(404, "Order nahi mila")
 
@@ -83,7 +83,13 @@ def complete_delivery(
         rider_profile = order.assigned_rider
         if rider_profile and hasattr(order, 'total_amount'):
             # Increase rider's cash on hand liability
-            rider_profile.cod_liability += Decimal(str(order.total_amount))
+            from app.models.rider import Rider
+            rider = db.query(Rider).filter(Rider.rider_profile_id == rider_profile.id).first()
+            if rider:
+                rider.cod_liability += Decimal(str(order.total_amount))
+            else:
+                db.rollback()
+                raise HTTPException(status_code=500, detail="Rider instance not found for this profile.")
             # A more accurate status for COD orders
             order.payment_status = "PAID_TO_RIDER"
         else:
@@ -92,10 +98,8 @@ def complete_delivery(
             raise HTTPException(status_code=500, detail="Rider or order amount info is missing for a COD order.")
     else: # For prepaid orders
         order.payment_status = "PAID"
-    
+
     db.commit()
     db.refresh(order)
-    if order.payment_method == "COD":
-        db.refresh(order.assigned_rider)
-    
+
     return {"message": "Congratulations! Order delivered successfully."}
