@@ -16,3 +16,4 @@ redis
 requests
 apscheduler
 firebase-admin
+psycopg2-binary
