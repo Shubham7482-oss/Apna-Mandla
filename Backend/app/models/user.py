@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
 from app.models.active_session import ActiveSession
 
+
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
@@ -13,10 +14,10 @@ class User(Base, TimestampMixin):
     unique_id = Column(String(50), unique=True, index=True)
     image_url = Column(String(255), nullable=True)
     device_token = Column(String(255), nullable=True)
-    
-    user_type = Column(String(20), default="CUSTOMER") # CUSTOMER, SELLER, RIDER, ADMIN, SUPER_ADMIN
+
+    user_type = Column(String(20), default="CUSTOMER")  # CUSTOMER, SELLER, RIDER, ADMIN, SUPER_ADMIN
     admin_role = Column(String(30), nullable=True)
-    
+
     is_active = Column(Boolean, default=True)
     mandla_id = Column(Integer, ForeignKey("mandlas.id"), nullable=True)
 
@@ -29,4 +30,10 @@ class User(Base, TimestampMixin):
     mini_website = relationship("MiniWebsite", back_populates="user", uselist=False)
     sessions = relationship("ActiveSession", back_populates="user", cascade="all, delete-orphan")
     tokens = relationship("Token", back_populates="user", cascade="all, delete-orphan")
-    udhar_accounts = relationship("UdharAccount", back_populates="user")
+
+    # FIXED
+    udhar_accounts = relationship(
+        "UdharAccount",
+        foreign_keys="UdharAccount.borrower_id",
+        back_populates="borrower",
+    )
