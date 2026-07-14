@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+passlib[bcrypt]
+python-jose
+sqlalchemy
+pydantic
+fastapi-mail
+python-multipart
+greenlet
+alembic
+pydantic-settings
+python-slugify
+qrcode
+pillow
