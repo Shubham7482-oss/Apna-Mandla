@@ -74,7 +74,7 @@ class Order(Base, TimestampMixin, SoftArchiveMixin):
     # Relationships
     customer: Mapped["User"] = relationship("User", foreign_keys=[customer_id])
     shop: Mapped[Optional["Shop"]] = relationship("Shop", foreign_keys=[shop_id])
-    assigned_rider: Mapped[Optional["RiderProfile"]] = relationship("RiderProfile", foreign_keys=[assigned_rider_id])
+    assigned_rider: Mapped[Optional["RiderProfile"]] = relationship("RiderProfile", foreign_keys=[assigned_rider_id], back_populates="orders")
     items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
-    parcel: Mapped[Optional["Parcel"]] = relationship("Parcel", uselist=False)
+    parcel: Mapped[Optional["Parcel"]] = relationship("Parcel", back_populates="order", uselist=False)

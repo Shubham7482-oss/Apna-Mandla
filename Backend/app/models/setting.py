@@ -1,6 +1,6 @@
 
 from sqlalchemy import Column, String, JSON
-from app.core.database import Base
+from app.models.base import Base
 
 class Setting(Base):
     __tablename__ = "settings"

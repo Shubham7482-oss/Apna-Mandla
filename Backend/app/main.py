@@ -13,7 +13,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.api import api_router
 from app.core.config import settings
-from app.core.database import Base, engine
 from app.core.exception_handlers import (
     generic_exception_handler,
     http_exception_handler,
@@ -33,8 +32,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (DEBUG=%s)", settings.PROJECT_NAME, settings.DEBUG)
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database schema verified.")
+    logger.info("Database schema managed by Alembic migrations.")
 
     # Start background financial scheduler
     # (daily reconciliation, udhar interest, overdue flagging, OTP cleanup)
