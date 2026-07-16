@@ -11,7 +11,7 @@ Use get_db() as a FastAPI dependency to obtain a session per request.
 """
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session, sessionmaker, declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
@@ -62,7 +62,7 @@ SessionLocal = sessionmaker(
 # DECLARATIVE BASE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Base = declarative_base()
+from app.models.base import Base
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REQUEST-SCOPED SESSION DEPENDENCY
