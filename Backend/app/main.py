@@ -32,8 +32,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting %s (DEBUG=%s)", settings.PROJECT_NAME, settings.DEBUG)
-    Base.metadata.create_all(bind=engine)
+    logger.info("Starting %s (DEBUG=%s)", settings.PROJECT_NAME, settings.DEBUG)    
     logger.info("Database schema verified.")
 
     # Start background financial scheduler
