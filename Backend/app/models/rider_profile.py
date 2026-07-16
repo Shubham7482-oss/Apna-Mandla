@@ -95,4 +95,5 @@ class RiderProfile(Base, TimestampMixin, SoftArchiveMixin):
     orders = relationship(
         "Order",
         foreign_keys="Order.assigned_rider_id",
+        back_populates="assigned_rider",
     )

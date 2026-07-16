@@ -41,5 +41,5 @@ class Parcel(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=datetime.datetime.utcnow)
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
-    order: Mapped["Order"] = relationship("Order")
+    order: Mapped["Order"] = relationship("Order", back_populates="parcel")
     sender: Mapped["User"] = relationship("User")
