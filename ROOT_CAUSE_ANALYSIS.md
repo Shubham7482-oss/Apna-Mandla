@@ -45,3 +45,18 @@ To achieve a 100% clean, standard, and workaround-free database migration flow:
      ```
    - This creates the `alembic_version` table and inserts `2263534f5211` as the current version, without executing the initial migration steps (thus avoiding any duplicate table collisions).
    - Once stamped, running `alembic upgrade head` on Render will succeed perfectly (performing no actions since it is already up to date), and any future migrations will execute flawlessly.
+
+---
+
+# Addendum: Secure Signup Endpoint Fix
+
+## 1. The Issue
+When requesting `/api/v1/auth/signup`, the signup endpoint failed with internal server errors or database errors. There were several critical reasons for this:
+1. **Missing `signup_ip` Column**: The signup logic logged the client's IP in the `User` table (`signup_ip`), but this field was missing from the `User` model and database.
+2. **Missing `email`, `phone_verified`, and `email_verified` Columns**: Although queried and modified across the codebase, these fields were not defined in the core `User` model, causing schema mismatches.
+3. **Non-Nullable `hashed_password`**: The `users` table set `hashed_password` as `NOT NULL`, but OTP-based signup creates the user record before a password can be defined (password setup happens after OTP verification). This triggered `IntegrityError` upon insertion.
+
+## 2. The Solution
+1. **Model Upgrades**: Added `signup_ip`, `email`, `phone_verified`, and `email_verified` columns to the `User` model in `Backend/app/models/user.py`. Made the `hashed_password` column nullable to support OTP-only / passwordless intermediate states.
+2. **Alembic batch_alter_table Migration**: Generated and applied a clean, cross-compatible batch migration `c08fd113e94a_add_signup_ip_to_users_table.py` which works seamlessly across SQLite and PostgreSQL to add the missing columns and change column nullability.
+3. **Verification**: Successfully tested the `/api/v1/auth/signup` endpoint using real integration testing. The endpoint now completes with a correct HTTP 201 response.

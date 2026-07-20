@@ -10,7 +10,7 @@ class User(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String(15), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=True)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
     unique_id = Column(String(50), unique=True, index=True)
     image_url = Column(String(255), nullable=True)
     device_token = Column(String(255), nullable=True)
@@ -19,6 +19,10 @@ class User(Base, TimestampMixin):
     admin_role = Column(String(30), nullable=True)
 
     is_active = Column(Boolean, default=True)
+    signup_ip = Column(String(45), nullable=True)
+    email = Column(String(255), unique=True, index=True, nullable=True)
+    phone_verified = Column(Boolean, default=False, nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
     mandla_id = Column(Integer, ForeignKey("mandlas.id"), nullable=True)
 
     # Core Relationships only
