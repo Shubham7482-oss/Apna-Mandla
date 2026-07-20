@@ -1,4 +1,4 @@
-"""add signup_ip, email, phone_verified, and email_verified to users table and make hashed_password nullable
+"""add signup_ip, email, phone_verified, email_verified, is_archived, and archived_at to users table and make hashed_password nullable
 
 Revision ID: c08fd113e94a
 Revises: 2263534f5211
@@ -26,6 +26,8 @@ def upgrade() -> None:
         batch_op.create_index(op.f('ix_users_email'), ['email'], unique=True)
         batch_op.add_column(sa.Column('phone_verified', sa.Boolean(), nullable=False, server_default='0'))
         batch_op.add_column(sa.Column('email_verified', sa.Boolean(), nullable=False, server_default='0'))
+        batch_op.add_column(sa.Column('is_archived', sa.Boolean(), nullable=False, server_default='0'))
+        batch_op.add_column(sa.Column('archived_at', sa.DateTime(timezone=True), nullable=True))
         batch_op.alter_column('hashed_password', existing_type=sa.String(length=255), nullable=True)
 
 
@@ -33,6 +35,8 @@ def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table('users') as batch_op:
         batch_op.alter_column('hashed_password', existing_type=sa.String(length=255), nullable=False)
+        batch_op.drop_column('archived_at')
+        batch_op.drop_column('is_archived')
         batch_op.drop_column('email_verified')
         batch_op.drop_column('phone_verified')
         batch_op.drop_index(op.f('ix_users_email'))
