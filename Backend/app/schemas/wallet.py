@@ -19,7 +19,7 @@ class Wallet(WalletBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WalletTransactionBase(BaseModel):
@@ -35,5 +35,5 @@ class WalletTransaction(WalletTransactionBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 

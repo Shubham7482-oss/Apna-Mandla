@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
@@ -13,6 +14,8 @@ from app.core.config import settings
 from app.core.otp_security import hash_otp
 from app.services.sms_service import get_sms_provider
 from app.services.audit_service import log_action
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Authentication"])
 
@@ -77,7 +80,10 @@ def login(
         )
 
         if last_otp:
-            time_elapsed = (now - last_otp.created_at).total_seconds()
+            last_otp_created = last_otp.created_at
+            if last_otp_created.tzinfo is None:
+                last_otp_created = last_otp_created.replace(tzinfo=timezone.utc)
+            time_elapsed = (now - last_otp_created).total_seconds()
             if time_elapsed < 60:
                 try:
                     log_action(
@@ -192,7 +198,8 @@ def login(
     except HTTPException:
         raise
 
-    except Exception:
+    except Exception as e:
+        logger.exception("Unexpected error in login: %s", e)
         db.rollback()
 
         try:

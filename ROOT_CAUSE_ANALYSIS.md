@@ -48,15 +48,56 @@ To achieve a 100% clean, standard, and workaround-free database migration flow:
 
 ---
 
-# Addendum: Secure Signup Endpoint Fix
+# Addendum: Authentication Module Audit & Repair Report
 
-## 1. The Issue
-When requesting `/api/v1/auth/signup`, the signup endpoint failed with internal server errors or database errors. There were several critical reasons for this:
-1. **Missing `signup_ip` Column**: The signup logic logged the client's IP in the `User` table (`signup_ip`), but this field was missing from the `User` model and database.
-2. **Missing `email`, `phone_verified`, and `email_verified` Columns**: Although queried and modified across the codebase, these fields were not defined in the core `User` model, causing schema mismatches.
-3. **Non-Nullable `hashed_password`**: The `users` table set `hashed_password` as `NOT NULL`, but OTP-based signup creates the user record before a password can be defined (password setup happens after OTP verification). This triggered `IntegrityError` upon insertion.
+## 1. Summary of Discovered Issues & Resolutions
 
-## 2. The Solution
-1. **Model Upgrades**: Added `signup_ip`, `email`, `phone_verified`, and `email_verified` columns to the `User` model in `Backend/app/models/user.py`. Made the `hashed_password` column nullable to support OTP-only / passwordless intermediate states.
-2. **Alembic batch_alter_table Migration**: Generated and applied a clean, cross-compatible batch migration `c08fd113e94a_add_signup_ip_to_users_table.py` which works seamlessly across SQLite and PostgreSQL to add the missing columns and change column nullability.
-3. **Verification**: Successfully tested the `/api/v1/auth/signup` endpoint using real integration testing. The endpoint now completes with a correct HTTP 201 response.
+As part of a complete end-to-end architectural audit and repair of the authentication system, several missing fields, schema mismatches, and third-party library incompatibilities were identified and resolved to make the module internally consistent and bulletproof.
+
+### A. Missing Columns in `User` Model & Database
+- **Issue**: The signup and login routes referenced several fields on the `User` model (`signup_ip`, `email`, `phone_verified`, `email_verified`, `is_archived`, `archived_at`) that were missing from both the `User` SQLAlchemy model and the original database schema.
+- **Resolution**: Added `signup_ip`, `email`, `phone_verified`, and `email_verified` as columns on the `User` model (`Backend/app/models/user.py`). Changed the `User` model to inherit from `SoftArchiveMixin` to automatically incorporate `is_archived` and `archived_at` fields.
+
+### B. SQLite and PostgreSQL-Compatible Alembic Migrations
+- **Issue**: Standard table alteration (like column nullability or additions) can fail on certain dialects like SQLite because of the lack of `ALTER COLUMN` support.
+- **Resolution**: Updated the Alembic migration script `c08fd113e94a_add_signup_ip_to_users_table.py` to use Alembic's `batch_alter_table` context manager. This ensures cross-compatibility and clean execution across both SQLite and PostgreSQL.
+
+### C. Passwordless OTP Signup Support (Nullable `hashed_password`)
+- **Issue**: The initial database schema defined `hashed_password` as `NOT NULL`. However, the secure signup flow creates the user record during the OTP step, before the user defines their password. This caused insertions to fail with `IntegrityError`.
+- **Resolution**: Modified the `hashed_password` column to be nullable in both the SQLAlchemy model and the `c08fd113e94a` migration script to support OTP-only / passwordless intermediate states.
+
+### D. Model & Attribute Consistency (`password_hash` vs. `hashed_password`)
+- **Issue**: The `User` database column is named `hashed_password`, but several auth routes (like `/set-password`, `/reset-password`) and services set and retrieve `password_hash` directly on the `User` object, which would fail or go unsaved.
+- **Resolution**: Implemented a clean property getter and setter for `password_hash` on the `User` model mapping it directly to the underlying `hashed_password` column.
+
+### E. Passlib + Bcrypt 5.x Integration Failure
+- **Issue**: Modern versions of the `bcrypt` library (v5.x or newer) removed the legacy `__about__` attribute, causing Passlib's version-checking block to throw `AttributeError` or `ValueError` even for short passwords under 72 bytes.
+- **Resolution**: Explicitly pinned `bcrypt==4.3.0` in `Backend/requirements.txt` to guarantee clean, robust, and stable password hashing with `passlib` across all local, testing, and production environments.
+
+### F. Pydantic v2 Exception Serialization TypeErrors
+- **Issue**: Pydantic v2's custom validation exceptions (e.g. raised by validation checks in schemas) include `ValueError` or other python exception objects in the error list. When a validation error occurred, `validation_exception_handler` returned `exc.errors()` directly in `JSONResponse`, causing `json.dumps()` to throw a `TypeError: Object of type ValueError is not JSON serializable` on the server and return an HTTP 500 instead of HTTP 422.
+- **Resolution**: Added a recursive serializer `_serialize_error_obj` inside `exception_handlers.py` that parses error list dictionaries and converts any custom exception or `ValueError` objects to their safe, string representations before returning them.
+
+### G. Timezone-Naive vs. Timezone-Aware Datetime Subtraction
+- **Issue**: SQLite represents database timestamps as timezone-naive when retrieved, causing `TypeError: can't subtract offset-naive and offset-aware datetimes` in `auth_login.py` when calculating OTP cooldown offsets.
+- **Resolution**: Added robust timezone-handling checks to convert any naive datetimes retrieved from the database to UTC-aware datetimes before performing subtraction.
+
+---
+
+## 2. Dynamic End-To-End Verification Results
+
+All of the following endpoints have been verified to work with 100% success using the spied end-to-end validation test script:
+1. **POST `/api/v1/auth/signup`**: Returns HTTP 201 Created on registration and successfully mocks SMS delivery.
+2. **POST `/api/v1/auth/register`**: Properly enforces collision-guard and returns HTTP 400.
+3. **POST `/api/v1/auth/verify-otp` (signup)**: Successfully logs in and returns tokens (cookie path + Bearer tokens).
+4. **POST `/api/v1/auth/login`**: Successfully issues a secure login OTP.
+5. **POST `/api/v1/auth/verify-otp` (login)**: Successfully logs in and creates device sessions.
+6. **POST `/api/v1/auth/set-password`**: Successfully sets/changes password.
+7. **POST `/api/v1/auth/forgot-password`**: Successfully issues a password reset OTP.
+8. **POST `/api/v1/auth/reset-password`**: Successfully resets password with OTP validation.
+9. **POST `/api/v1/auth/refresh`**: Successfully rotates both refresh and access tokens.
+10. **GET `/api/v1/auth/sessions`**: Correctly lists all active, non-revoked device sessions.
+11. **DELETE `/api/v1/auth/sessions/{session_id}`**: Revokes specific sessions securely (IDOR-guarded).
+12. **DELETE `/api/v1/auth/sessions`**: Successfully revokes other sessions while keeping current session active.
+13. **POST `/api/v1/auth/logout`**: Successfully revokes current session.
+14. **POST `/api/v1/auth/logout-all`**: Successfully revokes all sessions across all devices for the user.
