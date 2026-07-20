@@ -32,12 +32,6 @@ def transfer_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.assigned_rider_id != rider_id:
-        raise HTTPException(status_code=403, detail="Not your order")
-
-    if order.status not in ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"]:
-        raise HTTPException(status_code=400, detail="Cannot transfer now")
-
     # 🔒 Lock rider
     rider = (
         db.query(Rider)
@@ -48,6 +42,12 @@ def transfer_order(
 
     if not rider:
         raise HTTPException(status_code=404, detail="Rider not found")
+
+    if order.assigned_rider_id != rider.rider_profile_id:
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    if order.status not in ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"]:
+        raise HTTPException(status_code=400, detail="Cannot transfer now")
 
     # =====================================================
     # CASE 1: BEFORE PARCEL PICKUP (FREE TRANSFER)

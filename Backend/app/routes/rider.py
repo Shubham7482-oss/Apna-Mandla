@@ -86,7 +86,7 @@ def rider_available_orders(
     db: Session = Depends(get_db)
 ):
     # ✅ Optimization: Only show orders if rider is ONLINE
-    if not rider.is_online:
+    if not rider.profile or not rider.profile.is_online:
         return {"message": "Please go online to see orders", "orders": []}
 
     orders = get_available_orders_for_rider(db, rider)
@@ -108,7 +108,7 @@ def rider_accept_order(
     rider: Rider = Depends(get_rider_profile), 
     db: Session = Depends(get_db)
 ):
-    order = accept_order(db=db, rider_id=rider.id, order_id=order_id)
+    order = accept_order(db=db, rider_id=rider.rider_profile_id, order_id=order_id)
     return {"message": "Order utha liya gaya hai!", "order_id": order.id}
 
 @router.post("/orders/{order_id}/complete")
@@ -128,6 +128,8 @@ def toggle_online_status(
     db: Session = Depends(get_db)
 ):
     """Rider ko Online/Offline karne ke liye"""
-    rider.is_online = not rider.is_online
+    if not rider.profile:
+        raise HTTPException(status_code=400, detail="Rider profile not found")
+    rider.profile.is_online = not rider.profile.is_online
     db.commit()
-    return {"is_online": rider.is_online}
+    return {"is_online": rider.profile.is_online}

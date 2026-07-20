@@ -33,7 +33,18 @@ def complete_delivery(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.assigned_rider_id != rider_id:
+    # 🔒 Lock rider
+    rider = (
+        db.query(Rider)
+        .filter(Rider.id == rider_id)
+        .with_for_update()
+        .first()
+    )
+
+    if not rider:
+        raise HTTPException(status_code=404, detail="Rider not found")
+
+    if order.assigned_rider_id != rider.rider_profile_id:
         raise HTTPException(status_code=403, detail="Not your order")
 
     if order.status != "OUT_FOR_DELIVERY":
@@ -55,17 +66,6 @@ def complete_delivery(
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     otp.is_used = True
-
-    # 🔒 Lock rider
-    rider = (
-        db.query(Rider)
-        .filter(Rider.id == rider_id)
-        .with_for_update()
-        .first()
-    )
-
-    if not rider:
-        raise HTTPException(status_code=404, detail="Rider not found")
 
     # =====================================================
     # 💰 HANDLE COD LIABILITY

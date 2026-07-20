@@ -76,16 +76,18 @@ def get_current_user(
 
 def require_roles(required_roles: List[str]):
     """Backward-compat role guard. Prefer app.core.rbac for new code."""
+    required_roles_upper = [r.upper() for r in required_roles]
     def role_checker(
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> Union[User, AdminUser]:
-        if current_user.user_type not in required_roles:
+        user_role = (current_user.user_type or "").upper()
+        if user_role not in required_roles_upper:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
             )
-        if current_user.user_type == "admin":
+        if user_role == "ADMIN":
             admin = (
                 db.query(AdminUser).filter(AdminUser.user_id == current_user.id).first()
             )
